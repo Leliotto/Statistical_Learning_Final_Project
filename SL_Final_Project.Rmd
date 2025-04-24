@@ -19,14 +19,7 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, results = 'show')
 # knitr::opts_chunk$set(fig.width=3.5, fig.height=2)
 knitr::opts_chunk$set(fig.align = 'center')
-library(ggplot2)
-library(GGally)
-library(dplyr)
-library(haven)
-```
 
-```{r}
-summary(cars)
 ```
 
 ## Including Plots
@@ -34,6 +27,6 @@ summary(cars)
 You can also embed plots, for example:
 
 ```{r}
-plot(pressure)
+
 ```
 
