@@ -19,21 +19,7 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, results = 'show')
 # knitr::opts_chunk$set(fig.width=3.5, fig.height=2)
 knitr::opts_chunk$set(fig.align = 'center')
-```
 
-## R Markdown
-
-
-
-```{r}
-library(ggplot2)
-library(dplyr)
-
-diabetes <- read.csv("diabetes.csv", header = TRUE) # dobbiamo tenerli tutti altrimenti perdiamo 2/3 del dataset
-diabetes$gender <- factor(diabetes$gender, levels = c("male", "female"), labels = c("male", "female"))
-diabetes$location <- factor(diabetes$location, levels = c("Buckingham", "Louisa"), labels = c("Buckingham", "Louisa"))
-diabetes$frame <- factor(diabetes$frame, levels = c("small", "medium", "large"), labels = c("small", "medium", "large"))
-diabetes$id <- NULL
 ```
 
 ## Including Plots
@@ -41,25 +27,6 @@ diabetes$id <- NULL
 You can also embed plots, for example:
 
 ```{r}
-# standardizzare secondo il massimo di colonna.
-# oppure Z-score
-# analisi univariata
-# analisi bivariata
-# rimozione missings
-num_vars <- diabetes %>% select(where(is.numeric)) %>% names()
-factor_vars <- c("gender", "frame", "location")
-
-for (f in factor_vars) {
-  for (n in num_vars) {
-    p <- ggplot(diabetes, aes_string(x = f, y = n)) +
-      geom_boxplot(fill = "#69b3a2", alpha = 0.7) +
-      theme_minimal() +
-      labs(title = paste("Distribuzione di", n, "per", f),
-           x = f, y = n)
-    print(p)
-  }
-}
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
