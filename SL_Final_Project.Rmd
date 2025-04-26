@@ -31,52 +31,6 @@ diabetes$gender <- factor(diabetes$gender, levels = c("male", "female"), labels 
 diabetes$location <- factor(diabetes$location, levels = c("Buckingham", "Louisa"), labels = c("Buckingham", "Louisa"))
 diabetes$frame <- factor(diabetes$frame, levels = c("small", "medium", "large"), labels = c("small", "medium", "large"))
 diabetes$id <- NULL
-
-# base tidy
-library(tidyverse)     # dplyr, ggplot2, readr, …
-# preprocessing + modelling
-install.packages("rlang")
-library(tidymodels)    # recipes, parsnip, workflows, rsample, yardstick
-# per KNN‐impute (step_knnimpute usa fastknn)
-install.packages("kknn")
-library(kknn)
-
-diabetes <- read.csv("diabetes.csv", header = TRUE) %>% 
-  # fattori espliciti
-  mutate(
-    gender   = factor(gender,   levels = c("male", "female")),
-    location = factor(location, levels = c("Buckingham", "Louisa")),
-    frame    = factor(frame,    levels = c("small", "medium", "large"))
-  ) %>% 
-  select(-id)                       # rimuovi id
-
-knn_rec <- recipe(~ ., data = diabetes) %>%        # nessuna outcome ancora
-  # dummy delle categoriche (necessario perché kNN lavora su numerico)
-  step_dummy(all_nominal_predictors()) %>%         
-  # KNN-imput per *tutti* i predittori con NA
-  step_knnimpute(all_predictors(), neighbors = 5, weight_func = "distance") %>% 
-  # riportiamo le variabili factor dummy→back se serve (non indispensabile qui)
-  step_undo_dummy(all_outcomes(), tidy = TRUE)
-
-# esegui la ricetta
-prepped <- prep(knn_rec, training = diabetes, verbose = TRUE)
-diabetes_imp <- bake(prepped, new_data = NULL)
-
-diabetes_imp <- diabetes_imp %>% 
-  mutate(diagnosis = as.factor(if_else(glyhb > 7, 1, 0)))
-
-diabetes_imp %>% 
-  count(diagnosis)
-
-sapply(diabetes_imp, function(x) sum(is.na(x)))     # nessun NA residuo
-
-write_csv(diabetes_imp, "diabetes_knn.csv")
-
-library(VIM)
-diabetes_imp <- kNN(diabetes, k = 5, weightDist = TRUE, imp_var = FALSE)
-diabetes_imp$diagnosis <- factor(if_else(diabetes_imp$glyhb > 7, 1, 0))
-
-
 ```
 
 ```{r}
@@ -120,4 +74,44 @@ completed_data <- complete(imputed_data_custom, 1)
 summary(completed_data)
 
 
+```
+
+```{r}
+# Carica le librerie necessarie
+library(mice)    # Per l'imputazione multivariata (MICE)
+library(dplyr)   # Per la manipolazione dei dati
+
+set.seed(123)
+
+# 1. Conversione delle colonne categoriche in fattori
+diabetes <- diabetes %>%
+  mutate(
+    gender = as.factor(gender),
+    location = as.factor(location),
+    frame = as.factor(frame)
+  )
+
+# Definisci i metodi per colonna
+method <- rep("pmm", ncol(diabetes))
+method[colnames(diabetes) == "gender"] <- "logreg"
+method[colnames(diabetes) == "location"] <- "polyreg"
+method[colnames(diabetes) == "frame"] <- "polr"
+
+imputed_data <- mice(
+  diabetes,   # Esclude la prima colonna (id)
+  m = 5,
+  method = method,  # Predictive Mean Matching (adatto per dati numerici e categorici)
+  maxit = 15
+)
+
+# 3. Estrai il dataset completo
+complete_df <- complete(imputed_data)
+complete_df
+# 4. Ricostruisci il dataframe finale (aggiungi l'id se necessario)
+complete_df <- cbind(id = df$id, complete_df)
+
+# Verifica che non ci siano più NA
+sum(is.na(complete_df))  # Dovrebbe restituire 0
+
+write.csv(complete_df, "diabetes_mice.csv")
 ```
