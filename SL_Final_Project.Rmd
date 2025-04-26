@@ -22,10 +22,6 @@ knitr::opts_chunk$set(fig.align = 'center')
 
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
 ```{r}
 library(ggplot2)
 library(dplyr)
@@ -39,9 +35,10 @@ diabetes$id <- NULL
 # base tidy
 library(tidyverse)     # dplyr, ggplot2, readr, …
 # preprocessing + modelling
+install.packages("rlang")
 library(tidymodels)    # recipes, parsnip, workflows, rsample, yardstick
 # per KNN‐impute (step_knnimpute usa fastknn)
-install.packages("kknn")   # se non l'hai mai installato
+install.packages("kknn")
 library(kknn)
 
 diabetes <- read.csv("diabetes.csv", header = TRUE) %>% 
@@ -103,8 +100,6 @@ for (f in factor_vars) {
 }
 ```
 
-HEAD
-
 ```{r}
 # Installazione e caricamento del pacchetto
 library(mice)
@@ -126,4 +121,3 @@ summary(completed_data)
 
 
 ```
-origin/master
