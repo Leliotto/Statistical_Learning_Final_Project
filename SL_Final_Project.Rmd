@@ -31,6 +31,15 @@ diabetes$gender <- factor(diabetes$gender, levels = c("male", "female"), labels 
 diabetes$location <- factor(diabetes$location, levels = c("Buckingham", "Louisa"), labels = c("Buckingham", "Louisa"))
 diabetes$frame <- factor(diabetes$frame, levels = c("small", "medium", "large"), labels = c("small", "medium", "large"))
 diabetes$id <- NULL
+
+diabetes$bmi <- (diabetes$weight*0.453592)/((diabetes$height*0.0254)^2)
+
+# Aggiungi la colonna target (1 se glyhb >= 7.0, 0 altrimenti)
+diabetes$diagnosis <- ifelse(diabetes$glyhb >= 7.0, 1, 0)
+
+# Converti in fattore (utile per la classificazione)
+diabetes$diagnosis <- as.factor(diabetes$diagnosis)
+  
 ```
 
 ```{r}
@@ -53,32 +62,7 @@ for (f in factor_vars) {
   }
 }
 ```
-
 ```{r}
-# Installazione e caricamento del pacchetto
-library(mice)
-
-# Visualizzazione del pattern dei dati mancanti
-md.pattern(diabetes)
-
-# Esecuzione dell'imputazione
-# imputed_data <- mice(data, m = 5, method = 'pmm', seed = 123)
-
-method_vector <- c("pmm", "pmm", "pmm", "pmm", "pmm", "logreg", "pmm", "logreg", "pmm", "pmm", "polyreg", "pmm", "pmm", "pmm", "pmm", "pmm", "pmm", "pmm")
-imputed_data_custom <- mice(diabetes, method = method_vector, m = 5, maxit = 10)
-
-# Estrazione del dataset completo
-completed_data <- complete(imputed_data_custom, 1)
-
-# Analisi dei dati imputati
-summary(completed_data)
-
-
-```
-
-```{r}
-# Carica le librerie necessarie
-library(mice)    # Per l'imputazione multivariata (MICE)
 library(dplyr)   # Per la manipolazione dei dati
 
 set.seed(123)
@@ -90,6 +74,55 @@ diabetes <- diabetes %>%
     location = as.factor(location),
     frame = as.factor(frame)
   )
+
+## 1. Sostituisci bp.2* mancanti con bp.1*
+diabetes <- diabetes %>% 
+  mutate(
+    bp.2s_filled = if_else(is.na(bp.2s), bp.1s, bp.2s),
+    bp.2d_filled = if_else(is.na(bp.2d), bp.1d, bp.2d)
+  )
+
+## 2. Calcola le medie
+diabetes <- diabetes %>% 
+  mutate(
+    bp.s_mean = round((bp.1s + bp.2s_filled) / 2),
+    bp.d_mean = round((bp.1d + bp.2d_filled) / 2)
+  )
+
+## 3. (Opzionale) rimuovi le colonne intermedie
+diabetes <- diabetes %>% 
+  select(-bp.2s_filled, -bp.2d_filled)
+
+## Controllo rapido
+summary(select(diabetes, bp.1s, bp.2s, bp.s_mean, bp.1d, bp.2d, bp.d_mean))
+
+diabetes_clean <- diabetes %>% 
+  # conserva solo le righe in cui TUTTE le colonne tranne altri non hanno NA
+  filter(
+    if_all(-c(location, hip, age, height, weight, frame, gender, waist, bp.2s, bp.2d, time.ppn), ~ !is.na(.x))
+  )
+
+df_model <- diabetes_clean %>%
+  select(
+    chol,
+    stab.glu,
+    hdl,
+    ratio,
+    bmi,
+    bp.s_mean,
+    bp.d_mean,
+    diagnosis
+  )
+
+write.csv(diabetes_clean, "diabetes_clean.csv")
+write.csv(df_model, "diabetes_megapulito.csv")
+
+```
+
+
+```{r}
+# Carica le librerie necessarie
+library(mice)    # Per l'imputazione multivariata (MICE)
 
 # Definisci i metodi per colonna
 method <- rep("pmm", ncol(diabetes))
@@ -107,11 +140,7 @@ imputed_data <- mice(
 # 3. Estrai il dataset completo
 complete_df <- complete(imputed_data)
 complete_df
-# 4. Ricostruisci il dataframe finale (aggiungi l'id se necessario)
-complete_df <- cbind(id = df$id, complete_df)
-
-# Verifica che non ci siano più NA
-sum(is.na(complete_df))  # Dovrebbe restituire 0
 
 write.csv(complete_df, "diabetes_mice.csv")
+
 ```
