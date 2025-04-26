@@ -35,6 +35,9 @@ diabetes$gender <- factor(diabetes$gender, levels = c("male", "female"), labels 
 diabetes$location <- factor(diabetes$location, levels = c("Buckingham", "Louisa"), labels = c("Buckingham", "Louisa"))
 diabetes$frame <- factor(diabetes$frame, levels = c("small", "medium", "large"), labels = c("small", "medium", "large"))
 diabetes$id <- NULL
+
+diabetes$diagnosis <- ifelse(diabetes$glyhb >= 7.0, 1, 0)
+
 ```
 
 ```{r}
@@ -56,4 +59,26 @@ for (f in factor_vars) {
     print(p)
   }
 }
+```
+
+```{r}
+# Installazione e caricamento del pacchetto
+library(mice)
+
+# Visualizzazione del pattern dei dati mancanti
+md.pattern(diabetes)
+
+# Esecuzione dell'imputazione
+# imputed_data <- mice(data, m = 5, method = 'pmm', seed = 123)
+
+method_vector <- c("pmm", "pmm", "pmm", "pmm", "pmm", "logreg", "pmm", "logreg", "pmm", "pmm", "polyreg", "pmm", "pmm", "pmm", "pmm", "pmm", "pmm", "pmm")
+imputed_data_custom <- mice(diabetes, method = method_vector, m = 5, maxit = 10)
+
+# Estrazione del dataset completo
+completed_data <- complete(imputed_data_custom, 1)
+
+# Analisi dei dati imputati
+summary(completed_data)
+
+
 ```
