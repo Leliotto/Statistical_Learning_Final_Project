@@ -23,26 +23,6 @@ knitr::opts_chunk$set(fig.align = 'center')
 ```
 
 ```{r}
-library(ggplot2)
-library(dplyr)
-
-diabetes <- read.csv("diabetes.csv", header = TRUE) # dobbiamo tenerli tutti altrimenti perdiamo 2/3 del dataset
-diabetes$gender <- factor(diabetes$gender, levels = c("male", "female"), labels = c("male", "female"))
-diabetes$location <- factor(diabetes$location, levels = c("Buckingham", "Louisa"), labels = c("Buckingham", "Louisa"))
-diabetes$frame <- factor(diabetes$frame, levels = c("small", "medium", "large"), labels = c("small", "medium", "large"))
-diabetes$id <- NULL
-
-diabetes$bmi <- (diabetes$weight*0.453592)/((diabetes$height*0.0254)^2)
-
-# Aggiungi la colonna target (1 se glyhb >= 7.0, 0 altrimenti)
-diabetes$diagnosis <- ifelse(diabetes$glyhb >= 7.0, 1, 0)
-
-# Converti in fattore (utile per la classificazione)
-diabetes$diagnosis <- as.factor(diabetes$diagnosis)
-  
-```
-
-```{r}
 # standardizzare secondo il massimo di colonna.
 # oppure Z-score
 # analisi univariata
@@ -62,10 +42,19 @@ for (f in factor_vars) {
   }
 }
 ```
+
+
+
 ```{r}
 library(dplyr)   # Per la manipolazione dei dati
 
 set.seed(123)
+
+diabetes <- read.csv("diabetes.csv", header = TRUE) # dobbiamo tenerli tutti altrimenti perdiamo 2/3 del dataset
+# aggiungi colonna bmi
+diabetes$bmi <- (diabetes$weight*0.453592)/((diabetes$height*0.0254)^2)
+# Aggiungi la colonna target (1 se glyhb >= 7.0, 0 altrimenti)
+diabetes$diagnosis <- ifelse(diabetes$glyhb >= 7.0, 1, 0)
 
 # 1. Conversione delle colonne categoriche in fattori
 diabetes <- diabetes %>%
@@ -73,6 +62,7 @@ diabetes <- diabetes %>%
     gender = as.factor(gender),
     location = as.factor(location),
     frame = as.factor(frame)
+    diagnosis = as.factor(diagnosis)
   )
 
 ## 1. Sostituisci bp.2* mancanti con bp.1*
@@ -138,6 +128,31 @@ sum(df_model$whr >= 0.8813459 & df_model$diagnosis == 1)
 
 #plsmo in RMS per andamento predittori
 #nomogram con modello finale
+
+
+```
+# Analisi Descrittiva
+```{r}
+library(rms)
+# calcola le distribuzioni univariate
+dd <- datadist(diabetes)
+# usa dd come oggetto globale per le regressioni rms
+options(datadist = "dd")
+
+# fitta una spline con 4 nodi nella relazione con BMI come predittore per glyhb
+fit <- ols(glyhb ~ rcs(bmi, 4), data = diabetes)
+plsmo(diabetes$bmi, diabetes$glyhb, labelx = "BMI", xlab = "BMI", ylab = "Glycosylated Hemoglobin")
+
+# Lista dei predittori candidati
+predictors <- c("stab.glu", "ratio", "age", "chol", "bp.s_mean", "whr")
+
+# Ciclo per graficare la relazione con glyhb
+par(mfrow = c(3, 3))  # layout multiplo
+for (var in predictors) {
+  plsmo(x = diabetes[[var]], y = diabetes$glyhb,
+        xlab = var, ylab = "Glycosylated Hemoglobin",
+        main = paste("Glyhb vs", var))
+}
 
 
 ```
