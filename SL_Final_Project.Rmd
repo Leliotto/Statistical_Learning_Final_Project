@@ -1,6 +1,6 @@
 ---
 title: "SL_Final_Project"
-author: "Davide Fabio"
+author: "Davide Fabio Francesco"
 date: "2025-04-23"
 output:
   pdf_document:
@@ -61,7 +61,7 @@ diabetes <- diabetes %>%
   mutate(
     gender = as.factor(gender),
     location = as.factor(location),
-    frame = as.factor(frame)
+    frame = as.factor(frame),
     diagnosis = as.factor(diagnosis)
   )
 
@@ -102,6 +102,7 @@ df_model <- diabetes_clean %>%
     stab.glu,
     hdl,
     ratio,
+    age,
     bmi,
     whr,
     bp.s_mean,
@@ -156,6 +157,8 @@ for (var in predictors) {
 
 
 ```
+
+
 
 
 ```{r}
@@ -244,6 +247,291 @@ auc(roc_obj)
 summary(logit_model$finalModel)  # Coefficienti e p-value
 varImp(logit_model)             # Importanza delle variabili
 ```
+
+ALTRI MODELLI
+
+
+Modello minimale 'age', 'stab_glu'
+
+```{r}
+# Carica le librerie necessarie
+library(caret)
+library(dplyr)
+library(pROC)
+install.packages("rms")
+
+# 1. Shuffle del dataset (mescola le righe)
+set.seed(123)  # Per riproducibilità
+df_model_shuffled <- df_model %>% 
+  sample_frac(size = 1, replace = FALSE)  # Mescola senza ripetizioni
+table(df_model_shuffled$diagnosis)
+
+# 2. Split in TRAIN (80%) e TEST (20%) stratificato
+train_index <- createDataPartition(
+  df_model_shuffled$diagnosis,
+  p = 0.8, 
+  list = FALSE
+)
+train_data <- df_model_shuffled[train_index, ]
+test_data <- df_model_shuffled[-train_index, ]
+
+# 3. Configura la K-Fold Cross-Validation (es. 10-fold)
+ctrl <- trainControl(
+  method = "cv",     # Cross-Validation
+  number = 15,       # Numero di fold
+  savePredictions = "final",
+  classProbs = TRUE,  # Necessario per ROC-AUC
+  summaryFunction = twoClassSummary  # Se diabetic è factor con livelli "0"/"1"
+)
+
+ctrl_boot <- trainControl(
+  method = "boot",          # Metodo: Bootstrap resampling
+  number = 100,              # Numero di bootstrap samples
+  savePredictions = "final",
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+
+# 4. Addestra il modello con K-Fold e Regressione Logistica
+# Nota: Converti 'diabetic' in factor con livelli validi per caret
+train_data$diagnosis <- make.names(train_data$diagnosis)  # Converti in "X0"/"X1"
+
+logit_model <- train(
+  diagnosis ~     age + stab.glu,
+  data = train_data,
+  method = "glm",        # Regressione Logistica
+  family = "binomial",   # Famiglia per classificazione
+  trControl = ctrl,
+  preProcess = c("center", "scale"),  # Normalizza le variabili
+  metric = "ROC"         # Ottimizza per l'AUC
+)
+
+# 5. Valutazione sul Test Set
+# Prepara il test set
+test_data$diagnosis <- make.names(test_data$diagnosis)  # Stessa conversione del training
+
+# Predizioni
+test_pred <- predict(logit_model, newdata = test_data)
+test_prob <- predict(logit_model, newdata = test_data, type = "prob")[, "X1"]  # Probabilità per classe "1"
+
+test_pred <- factor(test_pred, levels = c("X0", "X1"))
+test_data$diagnosis <- factor(test_data$diagnosis, levels = c("X0", "X1"))
+table(test_pred)
+table(test_data$diagnosis)
+
+## Matrice di confusione
+confusionMatrix(
+  test_pred,
+  test_data$diagnosis,
+  positive = "X1"  # Specifica la classe positiva (diabetici)
+)
+
+# ROC-AUC
+roc_obj <- roc(
+  response = as.numeric(test_data$diagnosis == "X1"),
+  predictor = test_prob
+)
+plot(roc_obj, main = "ROC Curve")
+auc(roc_obj)
+
+# 6. Output del modello finale
+summary(logit_model$finalModel)  # Coefficienti e p-value
+varImp(logit_model)             # Importanza delle variabili
+```
+
+
+Modello Metabolico 'chol', 'age', 'hdl', 'stab_glu'
+
+
+```{r}
+# Carica le librerie necessarie
+library(caret)
+library(dplyr)
+library(pROC)
+install.packages("rms")
+
+# 1. Shuffle del dataset (mescola le righe)
+set.seed(123)  # Per riproducibilità
+df_model_shuffled <- df_model %>% 
+  sample_frac(size = 1, replace = FALSE)  # Mescola senza ripetizioni
+table(df_model_shuffled$diagnosis)
+
+# 2. Split in TRAIN (80%) e TEST (20%) stratificato
+train_index <- createDataPartition(
+  df_model_shuffled$diagnosis,
+  p = 0.8, 
+  list = FALSE
+)
+train_data <- df_model_shuffled[train_index, ]
+test_data <- df_model_shuffled[-train_index, ]
+
+# 3. Configura la K-Fold Cross-Validation (es. 10-fold)
+ctrl <- trainControl(
+  method = "cv",     # Cross-Validation
+  number = 15,       # Numero di fold
+  savePredictions = "final",
+  classProbs = TRUE,  # Necessario per ROC-AUC
+  summaryFunction = twoClassSummary  # Se diabetic è factor con livelli "0"/"1"
+)
+
+ctrl_boot <- trainControl(
+  method = "boot",          # Metodo: Bootstrap resampling
+  number = 100,              # Numero di bootstrap samples
+  savePredictions = "final",
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+
+# 4. Addestra il modello con K-Fold e Regressione Logistica
+# Nota: Converti 'diabetic' in factor con livelli validi per caret
+train_data$diagnosis <- make.names(train_data$diagnosis)  # Converti in "X0"/"X1"
+
+logit_model <- train(
+  diagnosis ~  chol + age + hdl + stab.glu,
+  data = train_data,
+  method = "glm",        # Regressione Logistica
+  family = "binomial",   # Famiglia per classificazione
+  trControl = ctrl,
+  preProcess = c("center", "scale"),  # Normalizza le variabili
+  metric = "ROC"         # Ottimizza per l'AUC
+)
+
+# 5. Valutazione sul Test Set
+# Prepara il test set
+test_data$diagnosis <- make.names(test_data$diagnosis)  # Stessa conversione del training
+
+# Predizioni
+test_pred <- predict(logit_model, newdata = test_data)
+test_prob <- predict(logit_model, newdata = test_data, type = "prob")[, "X1"]  # Probabilità per classe "1"
+
+test_pred <- factor(test_pred, levels = c("X0", "X1"))
+test_data$diagnosis <- factor(test_data$diagnosis, levels = c("X0", "X1"))
+table(test_pred)
+table(test_data$diagnosis)
+
+## Matrice di confusione
+confusionMatrix(
+  test_pred,
+  test_data$diagnosis,
+  positive = "X1"  # Specifica la classe positiva (diabetici)
+)
+
+# ROC-AUC
+roc_obj <- roc(
+  response = as.numeric(test_data$diagnosis == "X1"),
+  predictor = test_prob
+)
+plot(roc_obj, main = "ROC Curve")
+auc(roc_obj)
+
+# 6. Output del modello finale
+summary(logit_model$finalModel)  # Coefficienti e p-value
+varImp(logit_model)             # Importanza delle variabili
+```
+
+
+
+```{r}
+# Carica le librerie necessarie
+library(caret)
+library(dplyr)
+library(pROC)
+install.packages("rms")
+
+# 1. Shuffle del dataset (mescola le righe)
+set.seed(123)  # Per riproducibilità
+df_model_shuffled <- df_model %>% 
+  sample_frac(size = 1, replace = FALSE)  # Mescola senza ripetizioni
+table(df_model_shuffled$diagnosis)
+
+# 2. Split in TRAIN (80%) e TEST (20%) stratificato
+train_index <- createDataPartition(
+  df_model_shuffled$diagnosis,
+  p = 0.8, 
+  list = FALSE
+)
+train_data <- df_model_shuffled[train_index, ]
+test_data <- df_model_shuffled[-train_index, ]
+
+# 3. Configura la K-Fold Cross-Validation (es. 10-fold)
+ctrl <- trainControl(
+  method = "cv",     # Cross-Validation
+  number = 15,       # Numero di fold
+  savePredictions = "final",
+  classProbs = TRUE,  # Necessario per ROC-AUC
+  summaryFunction = twoClassSummary  # Se diabetic è factor con livelli "0"/"1"
+)
+
+ctrl_boot <- trainControl(
+  method = "boot",          # Metodo: Bootstrap resampling
+  number = 100,              # Numero di bootstrap samples
+  savePredictions = "final",
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+
+# 4. Addestra il modello con K-Fold e Regressione Logistica
+# Nota: Converti 'diabetic' in factor con livelli validi per caret
+train_data$diagnosis <- make.names(train_data$diagnosis)  # Converti in "X0"/"X1"
+
+logit_model <- train(
+  diagnosis ~     bp.s_mean + chol + bmi + age + hdl + stab.glu,
+  data = train_data,
+  method = "glm",        # Regressione Logistica
+  family = "binomial",   # Famiglia per classificazione
+  trControl = ctrl,
+  preProcess = c("center", "scale"),  # Normalizza le variabili
+  metric = "ROC"         # Ottimizza per l'AUC
+)
+
+# 5. Valutazione sul Test Set
+# Prepara il test set
+test_data$diagnosis <- make.names(test_data$diagnosis)  # Stessa conversione del training
+
+# Predizioni
+test_pred <- predict(logit_model, newdata = test_data)
+test_prob <- predict(logit_model, newdata = test_data, type = "prob")[, "X1"]  # Probabilità per classe "1"
+
+test_pred <- factor(test_pred, levels = c("X0", "X1"))
+test_data$diagnosis <- factor(test_data$diagnosis, levels = c("X0", "X1"))
+table(test_pred)
+table(test_data$diagnosis)
+
+## Matrice di confusione
+confusionMatrix(
+  test_pred,
+  test_data$diagnosis,
+  positive = "X1"  # Specifica la classe positiva (diabetici)
+)
+
+# ROC-AUC
+roc_obj <- roc(
+  response = as.numeric(test_data$diagnosis == "X1"),
+  predictor = test_prob
+)
+plot(roc_obj, main = "ROC Curve")
+auc(roc_obj)
+
+# 6. Output del modello finale
+summary(logit_model$finalModel)  # Coefficienti e p-value
+varImp(logit_model)             # Importanza delle variabili
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 ```{r}
 sum(is.na(diabetes$diagnosis))
 ```
@@ -254,7 +542,7 @@ sum(is.na(diabetes$diagnosis))
 diabetes$whr <- diabetes$waist / diabetes$hip
 
 # (facoltativo) quadrato del BMI per eventuale curvatura semplice
-diabetes$bmi_sq <- diabetes$bmi^2
+diabetes_clean$bmi_sq <- diabetes_clean$bmi^2
 # ---------------------------------------------------------------------
 
 ```
@@ -263,6 +551,7 @@ diabetes$bmi_sq <- diabetes$bmi^2
 ```{r}
 # --- NEW BLOCK: tidymodels pipeline con spline e SMOTE ---------------
 library(tidymodels)
+library(themis)
 set.seed(123)
 
 # dataset finale
@@ -305,7 +594,7 @@ res <- tune_grid(
   metrics = metric_set(roc_auc, pr_auc, accuracy)
 )
 
-best <- select_best(res, "roc_auc")
+best <- select_best(res, metric = "roc_auc")
 final_wf <- finalize_workflow(wf, best)
 
 # fit finale
